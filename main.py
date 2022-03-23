@@ -3,80 +3,96 @@ import json
 from bs4 import BeautifulSoup
 import requests
 
-url = 'http://apl.utfpr.edu.br/extensao/certificados/listaPublica'
-year=2013
+url = ''
+year = 2016
 now = datetime.datetime.now()
 
 event_ids = []
 
 items = []
 
-while(year<=2014):
-	_params = {'txtAno' : year}
-	html_doc = requests.post(url, data=_params)
+while(year <= now.year):
+    _params = {'txtAno': year}
+    url = 'http://apl.utfpr.edu.br/extensao/certificados/listaPublica'
+    html_doc = requests.post(url, data=_params)
 
-	soup = BeautifulSoup(html_doc.text, 'html.parser')
+    soup = BeautifulSoup(html_doc.text, 'html.parser')
 
-	select = soup.find('select', {'class' : 'combo', 'name': 'txtEvento'})
-	for option in select.find_all('option'):
-		event_ids.append(option['value'])
-	year+=1
+    select = soup.find('select', {'class': 'combo', 'name': 'txtEvento'})
 
-print('number of events ', len(event_ids))
+    for option in select.find_all('option'):
+        event_ids.append(option['value'])
 
-event_ids.remove('')
-# event_ids = ['2494']
+    print('number of events ', len(event_ids))
 
-for event_id in event_ids: 
-	if not event_id.isnumeric():
-		continue
+    event_ids.remove('')
 
-	_params = {'txtEvento' : ''+event_id+''}
+    for event_id in event_ids:
+        if not event_id.isnumeric():
+            continue
 
-	print('find all certificates for event id', event_id)
+        _params = {'txtEvento': event_id}
 
-	while True:
-		html_doc = requests.post(url, data=_params)
-		soup = BeautifulSoup(html_doc.text, 'html.parser')
+        print('find all certificates for event id', event_id)
 
-		found_certificates = soup.find('b', string='Não foram encontrados certificados válidos para emissão')
-		
-		has_certificates = found_certificates == None
-		print('has_certificates', has_certificates)
-		
-		if not has_certificates:
-			break
+        while True:
+            html_doc = requests.post(url, data=_params)
+            soup = BeautifulSoup(html_doc.text, 'html.parser')
 
-		tags_tr = soup.find_all('tr')
+            title = soup.find('div', {'class': 'titulo_right'}).h3.text.replace(
+                'Listagem de Certificados - ', '')
 
-		# remover cabeçalho
-		tags_tr.pop(0)
+            print('event name', title)
 
-		for person in tags_tr:
+            found_certificates = soup.find(
+                'b', string='Não foram encontrados certificados válidos para emissão')
 
-			tags_tds = person.find_all('td')
-			name = tags_tds[0].text.strip() 
-			certificate = tags_tds[1].text.strip() 
-			certificate_link = person.find_all('a', href=True)
+            has_certificates = found_certificates == None
+            print('has_certificates', has_certificates)
 
-			item = { 'name': name, 'certificate': certificate, 'certificate_link': certificate_link[0]['href'] }
+            if not has_certificates:
+                break
 
-			items.append(item)
-			print(item)
+            tags_tr = soup.find_all('tr')
 
-		next_page = soup.find("a", string="Próximo")
+            # remover cabeçalho
+            tags_tr.pop(0)
 
-		print('\n\n next',next_page)
+            for person in tags_tr:
 
-		has_next_page = next_page != None
-		if not has_next_page:
-			break
-		url =  next_page['href']
-		print('url next page', url)
+                tags_tds = person.find_all('td')
+                name = tags_tds[0].text.strip()
+                certificate = tags_tds[1].text.strip()
+                certificate_link = person.find('a', href=True)['href']
+                certificate_id = certificate_link.replace(
+                    'http://apl.utfpr.edu.br/extensao/certificados/validar/', '')
+                certificate_link_download = 'http://apl.utfpr.edu.br/extensao/emitir/' + certificate_id
 
+                item = {'name': name, 'event_name': title, 'certificate_id': certificate_id, 'certificate_type': certificate,
+                        'certificate_link_validation': certificate_link, 'certificate_link_download': certificate_link_download, 'year': year}
 
-file_name = './dataset.json'
-# file = open(file_name,'w+',  encoding='utf8')
+                items.append(item)
+                # print(item)
 
-with open(file_name, 'w+') as file:
-	json.dump(items, file, ensure_ascii=False)
+            next_page = soup.find("a", string="Próximo")
+
+            print('next', next_page)
+
+            has_next_page = next_page != None
+            if not has_next_page:
+                break
+            url = next_page['href']
+            print('url next page', url)
+
+    file_name = './dataset_'+str(year)+'.json'
+    # file = open(file_name,'w+',  encoding='utf8')
+
+    with open(file_name, 'w+') as file:
+        json.dump(items, file, ensure_ascii=False)
+
+        # reset for next year
+    event_ids = []
+    items = []
+    year += 1
+
+print('finished')
