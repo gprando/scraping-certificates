@@ -1,5 +1,6 @@
 import datetime
 import json
+import time
 from bs4 import BeautifulSoup
 import requests
 
@@ -36,6 +37,8 @@ while(year <= now.year):
         print('find all certificates for event id', event_id)
 
         while True:
+            time.sleep(2)
+            
             html_doc = requests.post(url, data=_params)
             soup = BeautifulSoup(html_doc.text, 'html.parser')
 
